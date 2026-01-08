@@ -14,10 +14,20 @@ def main():
     env = gym.make(args.env)
 
     for episode in range(10):
-        observation, _ = env.reset()
+        reset_result = env.reset()
+        if isinstance(reset_result, tuple) and len(reset_result) == 2:
+            observation, info = reset_result
+        else:
+            observation = reset_result
+            info = {}
         for step in range(50):
             action = env.action_space.sample()
-            observation, reward, done, truncated, info = env.step(action)
+            step_result = env.step(action)
+            if isinstance(step_result, tuple) and len(step_result) == 5:
+                observation, reward, terminated, truncated, info = step_result
+                done = terminated or truncated
+            else:
+                observation, reward, done, info = step_result
             print(f"{episode=:2} |{step=:2}, {reward=}, {done=}")
             if done:
                 break

@@ -13,7 +13,11 @@ import numpy as np
 
 from elastica import *
 from elastica.timestepper import extend_stepper_interface
-from elastica.experimental.interaction import AnisotropicFrictionalPlaneRigidBody
+try:
+    from elastica.experimental.interaction import AnisotropicFrictionalPlaneRigidBody
+except Exception:
+    # Optional import; not used in this module and can break on older elastica.
+    AnisotropicFrictionalPlaneRigidBody = None
 
 from gym_softrobot.utils.custom_elastica.joint import FixedJoint2Rigid
 from gym_softrobot.utils.custom_elastica.constraint import BodyBoundaryCondition
@@ -37,8 +41,6 @@ ARM_MATERIAL = {
     "density": 1000.0,
     "youngs_modulus": 1.5e4,
     "shear_modulus": 1.5e4 / (1.0 + 0.5),  # 0.5 Poisson Ratio
-    "nu": 0.20,
-    "nu_scale": 1e-2,
 }
 DEFAULT_SCALE_LENGTH = {
     # Arm length scale
@@ -70,10 +72,6 @@ def build_arm(
     arm_material["base_radius"] = np.linspace(
         DEFAULT_SCALE_LENGTH["base_radius"], DEFAULT_SCALE_LENGTH["tip_radius"], n_elem
     )
-    arm_material["nu"] *= (
-        (arm_material["base_radius"] / DEFAULT_SCALE_LENGTH["base_radius"]) ** 2.0
-    ) * arm_material["nu_scale"]
-
     rod = CosseratRod.straight_rod(**arm_material)
     return rod
 

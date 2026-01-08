@@ -120,7 +120,7 @@ class ReachEnv(Env):
         )
 
         self.simulator.constrain(self.rigid_rod).using(
-            OneEndFixedRod, constrained_position_idx=(0,), constrained_director_idx=(0,)
+            OneEndFixedBC, constrained_position_idx=(0,), constrained_director_idx=(0,)
         )
 
         # """ Controller Setup """
@@ -315,7 +315,8 @@ class ReachEnv(Env):
         maxwidth = 800
         aspect_ratio = 3 / 4
 
-        if self.viewer is None:
+        disable_viewer = getattr(self, "disable_viewer", False)
+        if self.viewer is None and not disable_viewer:
             from gym_softrobot.utils.render import pyglet_rendering
 
             self.viewer = pyglet_rendering.SimpleImageViewer(maxwidth=maxwidth)
@@ -363,7 +364,8 @@ class ReachEnv(Env):
         else:
             raise NotImplementedError("Rendering module is not imported properly")
 
-        self.viewer.imshow(state_image)
+        if self.viewer is not None and not disable_viewer:
+            self.viewer.imshow(state_image)
 
         return state_image
 

@@ -18,7 +18,10 @@ from gymnasium import error
 
 try:
     import pyglet
-    import pyglet.canvas
+    try:
+        from pyglet import canvas as pyglet_canvas
+    except Exception:
+        from pyglet import display as pyglet_canvas
 except ImportError as e:
     raise ImportError(
         """
@@ -30,6 +33,7 @@ except ImportError as e:
     )
 
 try:
+    import pyglet.gl as gl
     from pyglet.gl import *
 except ImportError as e:
     raise ImportError(
@@ -54,11 +58,11 @@ def get_display(spec):
     Pyglet only supports multiple Displays on Linux.
     """
     if spec is None:
-        return pyglet.canvas.get_display()
+        return pyglet_canvas.get_display()
         # returns already available pyglet_display,
         # if there is no pyglet display available then it creates one
     elif isinstance(spec, str):
-        return pyglet.canvas.Display(spec)
+        return pyglet_canvas.Display(spec)
     else:
         raise error.Error(
             f"Invalid display specification: {spec}. (Must be a string like :0 or None.)"

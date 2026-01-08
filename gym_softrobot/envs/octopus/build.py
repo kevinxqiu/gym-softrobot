@@ -41,7 +41,7 @@ _OCTOPUS_PROPERTIES = {  # default parameters
 }
 
 _DEFAULT_SCALE_LENGTH = {
-    "base_length": 0.35,
+    "base_length": 0.2,
     "base_radius": 0.35 * 0.02,
 }
 
@@ -221,6 +221,18 @@ def build_arm(
     override_params: Optional[dict] = None,
     attach_head: bool = None,  # TODO: To be implemented
     attach_weight: Optional[bool] = None,  # TODO: To be implemented
+    start: Optional[np.ndarray] = None,
+    direction: Optional[np.ndarray] = None,
+    normal: Optional[np.ndarray] = None,
+    add_ground: bool = True,
+    taper_ratio: Optional[float] = None,
+    base_length: Optional[float] = None,
+    damping_constant: Optional[float] = None,
+    fluid_density: Optional[float] = None,
+    drag_coeff_per: Optional[float] = None,
+    drag_coeff_tan: Optional[float] = None,
+    drag_step_skip: int = 1,
+    drag_callback_params: Optional[dict] = None,
 ):
     """Import default parameters (overridable)"""
     param = _OCTOPUS_PROPERTIES.copy()  # Always copy parameter for safety
@@ -228,20 +240,40 @@ def build_arm(
         param.update(override_params)
     """ Import default parameters (non-overridable) """
     arm_scale_param = _DEFAULT_SCALE_LENGTH.copy()
+    if base_length is not None:
+        if base_length <= 0.0:
+            raise ValueError("base_length must be positive")
+        arm_scale_param["base_length"] = base_length
 
     """ Set up an arm """
     L0 = arm_scale_param["base_length"]
     r0 = arm_scale_param["base_radius"]
 
-    arm_pos = np.array([0.0, 0.0, 0.0])
-    arm_dir = np.array([1.0, 0.0, 0.0])
-    normal = np.array([0.0, 0.0, 1.0])
+    arm_pos = np.array([0.0, 0.0, 0.0]) if start is None else start
+    arm_dir = np.array([1.0, 0.0, 0.0]) if direction is None else direction
+    rod_normal = np.array([0.0, 0.0, 1.0]) if normal is None else normal
+    radius_profile = arm_scale_param["base_radius"]
+    if taper_ratio is not None:
+        if taper_ratio <= 0.0:
+            raise ValueError("taper_ratio must be positive")
+        radius_profile = np.linspace(
+            arm_scale_param["base_radius"],
+            arm_scale_param["base_radius"] * taper_ratio,
+            n_elem,
+        )
+    if np.isscalar(radius_profile):
+        radius_base = float(radius_profile)
+        radius_tip = float(radius_profile)
+    else:
+        radius_base = float(radius_profile[0])
+        radius_tip = float(radius_profile[-1])
     rod = CosseratRod.straight_rod(
         n_elements=n_elem,
         start=arm_pos,
         direction=arm_dir,
-        normal=normal,
-        **arm_scale_param,
+        normal=rod_normal,
+        base_length=arm_scale_param["base_length"],
+        base_radius=radius_profile,
         **param,
     )
     simulator.append(rod)
@@ -268,23 +300,61 @@ def build_arm(
             np.array([mu, 1.5 * mu, 2.0 * mu]) * param["friction_multiplier"]
         )  # [forward, backward, sideways]
     static_mu_array = 2 * kinetic_mu_array
-    simulator.add_forcing_to(rod).using(
-        AnisotropicFrictionalPlane,
-        k=contact_k,
-        nu=contact_nu,
-        plane_origin=origin_plane,
-        plane_normal=normal,
-        slip_velocity_tol=slip_velocity_tol,
-        static_mu_array=static_mu_array,
-        kinetic_mu_array=kinetic_mu_array,
-    )
+    if add_ground:
+        plane_normal = np.array([0.0, 0.0, 1.0])
+        simulator.add_forcing_to(rod).using(
+            AnisotropicFrictionalPlane,
+            k=contact_k,
+            nu=contact_nu,
+            plane_origin=origin_plane,
+            plane_normal=plane_normal,
+            slip_velocity_tol=slip_velocity_tol,
+            static_mu_array=static_mu_array,
+            kinetic_mu_array=kinetic_mu_array,
+        )
 
-    damping_constant = 1e-2
+    if damping_constant is None:
+        damping_constant = 1e-2
+    if damping_constant < 0.0:
+        raise ValueError("damping_constant must be non-negative")
     simulator.dampen(rod).using(
         AnalyticalLinearDamper,
         damping_constant=damping_constant,
         time_step=time_step,
     )
+
+    drag_enabled = (
+        fluid_density is not None
+        or drag_coeff_per is not None
+        or drag_coeff_tan is not None
+    )
+    if drag_enabled:
+        if fluid_density is None:
+            raise ValueError("fluid_density must be set when enabling drag")
+        if drag_step_skip <= 0:
+            raise ValueError("drag_step_skip must be positive")
+        if drag_callback_params is None:
+            drag_callback_params = {}
+        if drag_coeff_per is None or drag_coeff_tan is None:
+            dl = L0 / n_elem
+            r_bar = 0.5 * (radius_base + radius_tip)
+            default_c_per = 0.41 / fluid_density / r_bar / dl
+            default_c_tan = 0.033 / fluid_density / np.pi / r_bar / dl
+            if drag_coeff_per is None:
+                drag_coeff_per = default_c_per
+            if drag_coeff_tan is None:
+                drag_coeff_tan = default_c_tan
+        from gym_softrobot.utils.actuation.forces.drag_force import DragForce
+
+        simulator.add_forcing_to(rod).using(
+            DragForce,
+            rho_environment=fluid_density,
+            c_per=drag_coeff_per,
+            c_tan=drag_coeff_tan,
+            system=rod,
+            step_skip=drag_step_skip,
+            callback_params=drag_callback_params,
+        )
 
     return rod
 

@@ -46,7 +46,19 @@ class FixedJoint2Rigid(FreeJoint):
         self.radius = radius
 
     # Apply force is same as free joint
-    def apply_forces(self, rod_one, index_one, rod_two, index_two):
+    def apply_forces(self, rod_one=None, index_one=None, rod_two=None, index_two=None, **kwargs):
+        system_one = rod_one if rod_one is not None else kwargs.get("system_one", None)
+        system_two = rod_two if rod_two is not None else kwargs.get("system_two", None)
+        if system_one is None or system_two is None:
+            return
+        rod_one = system_one
+        rod_two = system_two
+        if index_one is None:
+            index_one = kwargs.get("index_one", None)
+        if index_two is None:
+            index_two = kwargs.get("index_two", None)
+        if index_one is None or index_two is None:
+            return
         self.rigid_rod_pos = rod_one.position_collection[..., index_one].copy()
         self.rigid_rod_pos[2] = 0.0
         self.rigid_rod_connection_dir, contact_force = self._apply_forces(
@@ -121,7 +133,19 @@ class FixedJoint2Rigid(FreeJoint):
 
         return rigid_rod_connection_dir, contact_force
 
-    def apply_torques(self, rod_one, index_one, rod_two, index_two):
+    def apply_torques(self, rod_one=None, index_one=None, rod_two=None, index_two=None, **kwargs):
+        system_one = rod_one if rod_one is not None else kwargs.get("system_one", None)
+        system_two = rod_two if rod_two is not None else kwargs.get("system_two", None)
+        if system_one is None or system_two is None:
+            return
+        rod_one = system_one
+        rod_two = system_two
+        if index_one is None:
+            index_one = kwargs.get("index_one", None)
+        if index_two is None:
+            index_two = kwargs.get("index_two", None)
+        if index_one is None or index_two is None:
+            return
         # self._apply_hard_director_boundary(
         #        index_one,
         #        index_two,

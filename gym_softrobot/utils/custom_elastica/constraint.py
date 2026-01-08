@@ -23,20 +23,26 @@ class BodyBoundaryCondition(ConstraintBase):
         self.fixed_position = fixed_position
         self.fixed_director = fixed_director
 
-    def constrain_values(self, rod, time):
+    def constrain_values(self, rod=None, time=0.0, **kwargs):
+        system = rod if rod is not None else kwargs.get("system", None)
+        if system is None:
+            return
         self.compute_contrain_values(
-            rod.position_collection,
+            system.position_collection,
             self.fixed_position,
-            rod.director_collection,
+            system.director_collection,
             self.fixed_director,
         )
 
-    def constrain_rates(self, rod, time):
+    def constrain_rates(self, rod=None, time=0.0, **kwargs):
+        system = rod if rod is not None else kwargs.get("system", None)
+        if system is None:
+            return
         self.compute_constrain_rates(
-            rod.velocity_collection,
-            rod.omega_collection,
-            rod.acceleration_collection,
-            rod.alpha_collection,
+            system.velocity_collection,
+            system.omega_collection,
+            system.acceleration_collection,
+            system.alpha_collection,
         )
 
     @staticmethod
@@ -84,5 +90,4 @@ class BodyBoundaryCondition(ConstraintBase):
         # Rotational
         omega[:2, :] = 0.0
         #alpha[:2, :] = 0.0
-
 
