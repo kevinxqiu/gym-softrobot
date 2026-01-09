@@ -553,7 +553,7 @@ class ArmSingleEnv(Env):
             assert issubclass(Session, BaseElasticaRendererSession), (
                 "Rendering module is not properly subclassed"
             )
-            self.renderer = Session(
+            renderer_kwargs = dict(
                 width=maxwidth,
                 height=int(maxwidth * aspect_ratio),
                 projection=self.render_view,
@@ -561,6 +561,21 @@ class ArmSingleEnv(Env):
                 padding_ratio=self.render_axis_padding if self.render_view == "2d" else 0.0,
                 axis_limits=self.render_axis_limits,
             )
+            try:
+                import inspect
+
+                sig = inspect.signature(Session.__init__)
+                allowed = {
+                    key: value
+                    for key, value in renderer_kwargs.items()
+                    if key in sig.parameters
+                }
+                self.renderer = Session(**allowed)
+            except TypeError:
+                self.renderer = Session(
+                    width=maxwidth,
+                    height=int(maxwidth * aspect_ratio),
+                )
             self.renderer.add_rods(
                 [self.shearable_rod]
             )  # TODO: maybe need add_rod instead
